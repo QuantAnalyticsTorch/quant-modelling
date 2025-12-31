@@ -1,26 +1,32 @@
 # Copilot Instructions for quant-modelling
 
 ## Project Overview
-A quantitative modeling codebase (early stage). This document will be updated as the architecture solidifies.
+A quantitative modeling codebase. This document will be updated as the architecture solidifies.
+
+Use Pytorch for model implementation to facilitate autodifferentiation. Don't install the GPU version to save disk space.
+
+Create a flexibile pattern where pricing is done using the triple of (Model, Security, Calculator). This allows to price a 
+European option under Black model using Analytics, PDE or Monte-Carlo simulation.
 
 ## Directory Structure (Emerging)
-- Analytics: Core numerical and statistical functions. Also including linear algebra utilities and random number generation. Includes a Brownian bridge for Sobol numbers under Monte-Carlo
+
+- Analytics: Core numerical and statistical functions. Linear algebra utilities, optimizers and random number generation. Includes a Brownian bridge for Sobol numbers under Monte-Carlo
 - Models: Implementation of quantitative models (e.g., Black-Scholes, Dupire local volatility, Heston stochastic volatility)
 - MarketData: Market data structures such as spot, curves and volatility surfaces (SABR, SVI, SSVI)
 - Calculators: Analytical, Monte-Carlo simulations, PDE solvers, and other numerical methods. All Monte-Carlo simulations should vectorize over the number of paths so models need to support this.
 - Securities: Option payoff definitions and related financial instruments (European, American, Barrier options)
 - Scenarios: Market scenario generation and management
 
+### Dependencies & Tools
+- **Core**: NumPy, Pandas for numerical computing
+- **Modeling**: scikit-learn or similar for algorithmic work
+- **Testing**: pytest (assumed standard)
+- **Documentation**: docstrings with examples
+
 ## Key Patterns to Follow (As Established)
 
 Create a Python virtual environment for development. Install all packages and build a setup.py for easy installation.
-
 All coding should adhere to PEP 8 standards. Use type hints extensively for function signatures. 
-
-Use Pytorch for model implementation to facilitate autodifferentiation. Don't install the GPU version to save disk space.
-
-Create a flexibile pattern where pricing is done using the triple of (Model, Security, Calculator). This allows to price a 
-European option under Black model using Analytics, PDE or Monte-Carlo simulation.
 
 ### Model Development
 When creating quantitative models:
@@ -38,12 +44,6 @@ When creating quantitative models:
 - Unit tests for mathematical functions and model calculations
 - Integration tests for data pipelines
 - Performance benchmarks for computationally intensive operations
-
-### Dependencies & Tools
-- **Core**: NumPy, Pandas for numerical computing
-- **Modeling**: scikit-learn or similar for algorithmic work
-- **Testing**: pytest (assumed standard)
-- **Documentation**: docstrings with examples
 
 ## Future Guidance
 As components are added, update this file to include:
