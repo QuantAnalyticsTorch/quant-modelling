@@ -5,11 +5,12 @@ A quantitative modeling library for pricing financial derivatives using the Blac
 ## Features
 
 - **Black Model**: Implementation of the Black-76 model for pricing European options on forwards
+- **SVI Volatility Surface**: Stochastic Volatility Inspired (SVI) parametrization for modeling volatility smiles and skews
 - **Analytical Calculator**: Closed-form pricing formulas for European options
 - **Greek Calculations**: Delta, Gamma, Vega, and Theta for risk management
 - **European Options**: Support for call and put options
 - **Type-Safe**: Extensive use of Python type hints
-- **Well-Tested**: Comprehensive test suite with 38+ tests
+- **Well-Tested**: Comprehensive test suite with 57+ tests
 
 ## Installation
 
@@ -55,6 +56,37 @@ print(f"Vega: {greeks['vega']:.4f}")
 print(f"Theta: {greeks['theta']:.4f}")
 ```
 
+### Using SVI Volatility Surfaces
+
+```python
+from MarketData.svi_surface import SVIVolatilitySurface
+import numpy as np
+
+# Create an SVI volatility surface
+surface = SVIVolatilitySurface(
+    forward=100.0,           # Forward price
+    time_to_maturity=1.0,    # 1 year to maturity
+    a=0.04,                  # Vertical shift (ATM variance level)
+    b=0.15,                  # Slope parameter
+    rho=-0.6,                # Correlation (negative = downward skew)
+    m=0.0,                   # Horizontal shift
+    sigma=0.3                # Curvature parameter
+)
+
+# Get implied volatility at a specific strike
+vol_atm = surface.get_volatility(100.0)
+print(f"ATM Volatility: {vol_atm:.4f}")
+
+# Get volatilities across multiple strikes (vectorized)
+strikes = np.array([80.0, 90.0, 100.0, 110.0, 120.0])
+volatilities = surface.get_volatility(strikes)
+
+# Get total variance
+variance = surface.get_variance(100.0)
+```
+
+See `example_svi_surface.py` for a complete demonstration of SVI functionality.
+
 ## Architecture
 
 The library follows a flexible triple pattern: **(Model, Security, Calculator)**
@@ -89,12 +121,18 @@ pytest tests/ -v
 pytest tests/ --cov=. --cov-report=html
 ```
 
-## Example
+## Examples
 
-See `example_black_scholes.py` for a complete example:
+See `example_black_scholes.py` for pricing European options with the Black model:
 
 ```bash
 python example_black_scholes.py
+```
+
+See `example_svi_surface.py` for working with SVI volatility surfaces:
+
+```bash
+python example_svi_surface.py
 ```
 
 ## Mathematical Background
@@ -129,6 +167,36 @@ The library validates put-call parity:
 ```
 C - P = D × (F - K)
 ```
+
+### SVI Volatility Surface
+
+The SVI (Stochastic Volatility Inspired) model provides a parametric form for the volatility surface. The raw SVI formula for total implied variance is:
+
+**Variance Formula:**
+```
+w(k) = a + b × [ρ × (k - m) + √((k - m)² + σ²)]
+```
+
+Where:
+- `k = ln(K/F)` = Log-moneyness
+- `w(k)` = Total implied variance
+- `a` = Vertical shift parameter (controls ATM variance level)
+- `b` = Slope parameter (must be ≥ 0)
+- `ρ` = Correlation parameter (must be in [-1, 1], controls skew)
+- `m` = Horizontal shift parameter
+- `σ` = Curvature parameter (must be > 0, controls smile shape)
+
+**Implied Volatility:**
+```
+vol(k) = √(w(k) / T)
+```
+
+**Key Properties:**
+- Negative `ρ` creates downward skew (typical for equity markets)
+- Positive `ρ` creates upward skew
+- Parameter `b` controls the sensitivity of variance to moneyness
+- Non-negativity constraint: `a + b × σ × √(1 - ρ²) ≥ 0`
+
 
 ## Contributing
 
