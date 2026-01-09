@@ -184,7 +184,8 @@ class TestSVIVolatilitySurface:
         )
         
         # At ATM, k = 0, so w(0) = a + b * [rho * (0 - m) + sqrt((0 - m)^2 + sigma^2)]
-        # w(0) = 0.04 + 0.1 * [-0.4 * 0 + sqrt(0 + 0.04)]
+        # With m=0, sigma=0.2: sqrt((0 - 0)^2 + 0.2^2) = sqrt(0.04) = 0.2
+        # w(0) = 0.04 + 0.1 * [-0.4 * 0 + 0.2]
         # w(0) = 0.04 + 0.1 * 0.2 = 0.06
         expected_variance = 0.04 + 0.1 * np.sqrt(0.2**2)
         variance_atm = surface.get_variance(100.0)
