@@ -6,5 +6,6 @@ market data structures used in quantitative finance.
 
 from .volatility_surface import VolatilitySurface
 from .svi_surface import SVIVolatilitySurface
+from .sabr_surface import SABRVolatilitySurface
 
-__all__ = ['VolatilitySurface', 'SVIVolatilitySurface']
+__all__ = ['VolatilitySurface', 'SVIVolatilitySurface', 'SABRVolatilitySurface']

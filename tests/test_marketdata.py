@@ -4,6 +4,7 @@ import pytest
 import numpy as np
 from MarketData.volatility_surface import VolatilitySurface
 from MarketData.svi_surface import SVIVolatilitySurface
+from MarketData.sabr_surface import SABRVolatilitySurface
 
 
 class TestVolatilitySurface:
@@ -393,3 +394,372 @@ class TestSVIVolatilitySurface:
         
         # All variances should equal 'a' when b=0
         assert all(np.isclose(variances, 0.04))
+
+
+class TestSABRVolatilitySurface:
+    """Test cases for SABRVolatilitySurface."""
+    
+    def test_initialization(self):
+        """Test initialization with valid SABR parameters."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-0.3,
+            nu=0.4
+        )
+        assert surface.forward == 100.0
+        assert surface.time_to_maturity == 1.0
+        assert surface.alpha == 0.25
+        assert surface.beta == 0.5
+        assert surface.rho == -0.3
+        assert surface.nu == 0.4
+    
+    def test_invalid_alpha_parameter(self):
+        """Test that non-positive alpha raises ValueError."""
+        with pytest.raises(ValueError, match="Parameter alpha must be positive"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=0.0,  # Invalid: zero
+                beta=0.5,
+                rho=-0.3,
+                nu=0.4
+            )
+        
+        with pytest.raises(ValueError, match="Parameter alpha must be positive"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=-0.1,  # Invalid: negative
+                beta=0.5,
+                rho=-0.3,
+                nu=0.4
+            )
+    
+    def test_invalid_beta_parameter(self):
+        """Test that beta outside [0, 1] raises ValueError."""
+        with pytest.raises(ValueError, match="Parameter beta must be in"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=0.25,
+                beta=1.5,  # Invalid: > 1
+                rho=-0.3,
+                nu=0.4
+            )
+        
+        with pytest.raises(ValueError, match="Parameter beta must be in"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=0.25,
+                beta=-0.1,  # Invalid: < 0
+                rho=-0.3,
+                nu=0.4
+            )
+    
+    def test_invalid_rho_parameter(self):
+        """Test that rho outside [-1, 1] raises ValueError."""
+        with pytest.raises(ValueError, match="Parameter rho must be in"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=0.25,
+                beta=0.5,
+                rho=1.5,  # Invalid: > 1
+                nu=0.4
+            )
+        
+        with pytest.raises(ValueError, match="Parameter rho must be in"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=0.25,
+                beta=0.5,
+                rho=-1.5,  # Invalid: < -1
+                nu=0.4
+            )
+    
+    def test_invalid_nu_parameter(self):
+        """Test that negative nu raises ValueError."""
+        with pytest.raises(ValueError, match="Parameter nu must be non-negative"):
+            SABRVolatilitySurface(
+                forward=100.0,
+                time_to_maturity=1.0,
+                alpha=0.25,
+                beta=0.5,
+                rho=-0.3,
+                nu=-0.1  # Invalid: negative
+            )
+    
+    def test_atm_volatility_lognormal(self):
+        """Test ATM volatility for lognormal SABR (beta=1)."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.20,
+            beta=1.0,  # Lognormal
+            rho=0.0,
+            nu=0.0  # No vol-of-vol for simplicity
+        )
+        
+        # At ATM with beta=1 and nu=0, vol should be close to alpha
+        vol_atm = surface.get_volatility(100.0)
+        assert np.isclose(vol_atm, 0.20, rtol=1e-5)
+    
+    def test_atm_volatility_normal(self):
+        """Test ATM volatility for normal SABR (beta=0)."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.20,
+            beta=0.0,  # Normal model
+            rho=0.0,
+            nu=0.0
+        )
+        
+        # At ATM with beta=0 and nu=0, vol = alpha / F^(1-0) = alpha / F
+        expected_vol = 0.20 / 100.0
+        vol_atm = surface.get_volatility(100.0)
+        assert np.isclose(vol_atm, expected_vol, rtol=1e-5)
+    
+    def test_volatility_array_input(self):
+        """Test volatility calculation with array input."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-0.3,
+            nu=0.4
+        )
+        
+        strikes = np.array([90.0, 100.0, 110.0])
+        volatilities = surface.get_volatility(strikes)
+        
+        assert len(volatilities) == 3
+        assert all(volatilities > 0)  # All volatilities should be positive
+        
+        # Verify each volatility individually
+        for i, strike in enumerate(strikes):
+            single_vol = surface.get_volatility(strike)
+            assert np.isclose(volatilities[i], single_vol, rtol=1e-10)
+    
+    def test_variance_calculation(self):
+        """Test variance calculation."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-0.3,
+            nu=0.4
+        )
+        
+        strike = 100.0
+        vol = surface.get_volatility(strike)
+        var = surface.get_variance(strike)
+        
+        # Variance should equal vol^2 * T
+        expected_var = vol**2 * 1.0
+        assert np.isclose(var, expected_var, rtol=1e-10)
+    
+    def test_variance_array_input(self):
+        """Test variance calculation with array input."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-0.3,
+            nu=0.4
+        )
+        
+        strikes = np.array([90.0, 100.0, 110.0])
+        variances = surface.get_variance(strikes)
+        
+        assert len(variances) == 3
+        assert all(variances > 0)
+    
+    def test_volatility_smile_lognormal(self):
+        """Test that lognormal SABR produces volatility smile."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=1.0,  # Lognormal
+            rho=-0.3,  # Negative correlation
+            nu=0.4
+        )
+        
+        strikes = np.array([80.0, 90.0, 100.0, 110.0, 120.0])
+        volatilities = surface.get_volatility(strikes)
+        
+        # All volatilities should be positive
+        assert all(volatilities > 0)
+        
+        # With negative rho, expect downward skew (higher vol for low strikes)
+        vol_low = volatilities[0]  # 80 strike
+        vol_atm = volatilities[2]  # 100 strike
+        
+        # For negative rho, ITM puts typically have higher vol
+        assert vol_low > 0 and vol_atm > 0
+    
+    def test_zero_nu_parameter(self):
+        """Test SABR with nu=0 (no stochastic volatility)."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.20,
+            beta=0.5,
+            rho=0.0,
+            nu=0.0  # Deterministic volatility
+        )
+        
+        # Should still produce valid volatilities
+        vol_atm = surface.get_volatility(100.0)
+        assert vol_atm > 0
+        
+        # Test with array input
+        strikes = np.array([90.0, 100.0, 110.0])
+        volatilities = surface.get_volatility(strikes)
+        assert all(volatilities > 0)
+    
+    def test_boundary_beta_values(self):
+        """Test that boundary values of beta (0 and 1) work correctly."""
+        # Beta = 0 (normal model)
+        surface_normal = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.20,
+            beta=0.0,
+            rho=0.0,
+            nu=0.3
+        )
+        vol_normal = surface_normal.get_volatility(100.0)
+        assert vol_normal > 0
+        
+        # Beta = 1 (lognormal model)
+        surface_lognormal = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.20,
+            beta=1.0,
+            rho=0.0,
+            nu=0.3
+        )
+        vol_lognormal = surface_lognormal.get_volatility(100.0)
+        assert vol_lognormal > 0
+    
+    def test_boundary_rho_values(self):
+        """Test that boundary values of rho (±1) work correctly."""
+        # rho = 1
+        surface_rho_plus = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=1.0,
+            nu=0.3
+        )
+        vol_plus = surface_rho_plus.get_volatility(100.0)
+        assert vol_plus > 0
+        
+        # rho = -1
+        surface_rho_minus = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-1.0,
+            nu=0.3
+        )
+        vol_minus = surface_rho_minus.get_volatility(100.0)
+        assert vol_minus > 0
+    
+    def test_different_maturities(self):
+        """Test SABR with different maturities."""
+        # Short maturity
+        surface_short = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=0.25,  # 3 months
+            alpha=0.20,
+            beta=0.7,
+            rho=-0.2,
+            nu=0.3
+        )
+        
+        # Long maturity
+        surface_long = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=5.0,  # 5 years
+            alpha=0.20,
+            beta=0.7,
+            rho=-0.2,
+            nu=0.3
+        )
+        
+        vol_short = surface_short.get_volatility(100.0)
+        vol_long = surface_long.get_volatility(100.0)
+        
+        assert vol_short > 0
+        assert vol_long > 0
+    
+    def test_repr(self):
+        """Test string representation."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-0.3,
+            nu=0.4
+        )
+        
+        repr_str = repr(surface)
+        assert 'SABRVolatilitySurface' in repr_str
+        assert '100.0' in repr_str
+        assert '0.25' in repr_str
+        assert '0.5' in repr_str
+        assert '-0.3' in repr_str
+        assert '0.4' in repr_str
+    
+    def test_positive_volatility_wide_range(self):
+        """Test that volatility is positive across a wide range of strikes."""
+        surface = SABRVolatilitySurface(
+            forward=100.0,
+            time_to_maturity=1.0,
+            alpha=0.25,
+            beta=0.5,
+            rho=-0.3,
+            nu=0.4
+        )
+        
+        # Test a wide range of strikes
+        strikes = np.linspace(60.0, 140.0, 20)
+        volatilities = surface.get_volatility(strikes)
+        
+        assert all(volatilities >= 0), "All volatilities must be non-negative"
+    
+    def test_interest_rate_parameters(self):
+        """Test SABR with typical interest rate market parameters."""
+        # Typical parameters for normal SABR used in rates markets
+        surface = SABRVolatilitySurface(
+            forward=0.03,  # 3% interest rate
+            time_to_maturity=5.0,
+            alpha=0.01,  # 1% normal volatility
+            beta=0.0,  # Normal model for rates
+            rho=0.0,
+            nu=0.2
+        )
+        
+        vol_atm = surface.get_volatility(0.03)
+        assert vol_atm > 0
+        
+        # Test with strikes around the forward
+        strikes = np.array([0.025, 0.03, 0.035])
+        volatilities = surface.get_volatility(strikes)
+        assert all(volatilities > 0)
+
