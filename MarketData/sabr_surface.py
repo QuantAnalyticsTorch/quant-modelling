@@ -260,7 +260,7 @@ class SABRVolatilitySurface(VolatilitySurface):
             # Lognormal case: σ = (α / |log(F/K)|) × χ(z) × [corrections]
             # We need absolute value to ensure positive result
             if abs(log_FK) < 1e-10:
-                # Near ATM
+                # Near ATM - use limit as K -> F
                 numerator_term = alpha
             else:
                 # Use the formula structure that preserves positivity
@@ -272,8 +272,8 @@ class SABRVolatilitySurface(VolatilitySurface):
             K_beta = K**(1 - beta)
             diff = F_beta - K_beta
             
-            if abs(diff) < 1e-10:
-                # Near ATM
+            if abs(diff) < 1e-10 or abs(log_FK) < 1e-10:
+                # Near ATM - use limit as K -> F
                 numerator_term = alpha / F_beta
             else:
                 # σ_impl = α × χ(z) × (F^(1-β) - K^(1-β)) / [log(F/K) × (1-β)]
