@@ -104,6 +104,9 @@ class SSVIVolatilitySurface(VolatilitySurface):
         self.rho = rho
         self.gamma = gamma
         self.eta = eta
+        
+        # Pre-compute constant term to optimize variance calculation
+        self._rho_squared_complement = 1 - rho ** 2
     
     def _phi(self) -> float:
         """
@@ -132,7 +135,7 @@ class SSVIVolatilitySurface(VolatilitySurface):
         
         # Compute the SSVI variance formula
         phi_k = phi * k
-        term_inside_sqrt = (phi_k + self.rho) ** 2 + (1 - self.rho ** 2)
+        term_inside_sqrt = (phi_k + self.rho) ** 2 + self._rho_squared_complement
         
         variance = (self.theta / 2.0) * (
             1 + self.rho * phi_k + np.sqrt(term_inside_sqrt)
