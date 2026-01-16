@@ -6,11 +6,12 @@ A quantitative modeling library for pricing financial derivatives using the Blac
 
 - **Black Model**: Implementation of the Black-76 model for pricing European options on forwards
 - **SVI Volatility Surface**: Stochastic Volatility Inspired (SVI) parametrization for modeling volatility smiles and skews
+- **SSVI Volatility Surface**: Surface SVI (SSVI) arbitrage-free parametrization for modeling volatility surfaces across maturities
 - **Analytical Calculator**: Closed-form pricing formulas for European options
 - **Greek Calculations**: Delta, Gamma, Vega, and Theta for risk management
 - **European Options**: Support for call and put options
 - **Type-Safe**: Extensive use of Python type hints
-- **Well-Tested**: Comprehensive test suite with 57+ tests
+- **Well-Tested**: Comprehensive test suite with 75+ tests
 
 ## Installation
 
@@ -87,6 +88,36 @@ variance = surface.get_variance(100.0)
 
 See `example_svi_surface.py` for a complete demonstration of SVI functionality.
 
+### Using SSVI Volatility Surfaces
+
+```python
+from MarketData.ssvi_surface import SSVIVolatilitySurface
+import numpy as np
+
+# Create an SSVI volatility surface
+surface = SSVIVolatilitySurface(
+    forward=100.0,           # Forward price
+    time_to_maturity=1.0,    # 1 year to maturity
+    theta=0.04,              # ATM total variance
+    rho=-0.3,                # Correlation (negative = downward skew)
+    gamma=0.5,               # Power-law exponent
+    eta=1.5                  # Scale parameter
+)
+
+# Get implied volatility at a specific strike
+vol_atm = surface.get_volatility(100.0)
+print(f"ATM Volatility: {vol_atm:.4f}")
+
+# Get volatilities across multiple strikes (vectorized)
+strikes = np.array([80.0, 90.0, 100.0, 110.0, 120.0])
+volatilities = surface.get_volatility(strikes)
+
+# Get total variance
+variance = surface.get_variance(100.0)
+```
+
+See `example_ssvi_surface.py` for a complete demonstration of SSVI functionality.
+
 ## Architecture
 
 The library follows a flexible triple pattern: **(Model, Security, Calculator)**
@@ -133,6 +164,12 @@ See `example_svi_surface.py` for working with SVI volatility surfaces:
 
 ```bash
 python example_svi_surface.py
+```
+
+See `example_ssvi_surface.py` for working with SSVI volatility surfaces:
+
+```bash
+python example_ssvi_surface.py
 ```
 
 ## Mathematical Background
@@ -196,6 +233,37 @@ vol(k) = √(w(k) / T)
 - Positive `ρ` creates upward skew
 - Parameter `b` controls the sensitivity of variance to moneyness
 - Non-negativity constraint: `a + b × σ × √(1 - ρ²) ≥ 0`
+
+### SSVI Volatility Surface
+
+The SSVI (Surface SVI) model extends SVI to provide an arbitrage-free parametrization across multiple maturities. The SSVI formula for total implied variance is:
+
+**Variance Formula:**
+```
+w(k, θ) = θ/2 × {1 + ρ × φ(θ) × k + √[(φ(θ) × k + ρ)² + (1 - ρ²)]}
+```
+
+Where:
+- `k = ln(K/F)` = Log-moneyness
+- `w(k, θ)` = Total implied variance
+- `θ(T)` = ATM total variance at time T (must be > 0)
+- `φ(θ) = η / θ^γ` = Power-law function
+- `ρ` = Correlation parameter (must be in [-1, 1], controls skew)
+- `γ` = Power-law exponent (typically in [0, 1])
+- `η` = Scale parameter (must be > 0)
+
+**Implied Volatility:**
+```
+vol(k, θ) = √(w(k, θ) / T)
+```
+
+**Key Properties:**
+- Arbitrage-free parametrization across maturities
+- ATM variance equals `θ`: `w(0, θ) = θ`
+- Negative `ρ` creates downward skew (typical for equity markets)
+- `γ` and `η` control the wings behavior
+- Arbitrage-free constraint: `|ρ| ≤ (1 - γ) / (1 + γ)` for `γ > 0`
+- For `γ = 0`, the constraint simplifies and any `ρ ∈ [-1, 1]` is allowed
 
 
 ## Contributing
